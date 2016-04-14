@@ -1,73 +1,49 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
 
-ino_t get_inode (char *);
-void printpathto(ino_t);
-void inum_to_name(ino_t, char *, int);
+int main(int argc, char* argv[])
+{
 
-int main() {
-   printpathto(get_inode("."));
-   putchar('\n');
-   return 0;
+	if( argc != 3 )
+	{
+		perror( "Usage : mv [file1] [file2] or mv [file1] [directory]." );	//매개변수 관련 오류 처리
+		return -1;
+	}
+
+	if( strcmp( argv[1], argv[2] ) == 0 )
+	{
+		char buffer[BUFSIZ];
+		sprintf( buffer, "\'%s\' and \'%s\' area the same file.", argv[1], argv[2] ); //매개변수 관련 오류 처리
+		perror( buffer );
+		return -1;
+	}
+
+
+	int error = 0;	
+	DIR* dir;
+	if( dir = opendir( argv[2] ) ) {			//디렉토리일경우 이동
+		char newLocation[BUFSIZ];
+		sprintf( newLocation, "%s/%s", argv[2], argv[1] );
+		error = rename( argv[1], newLocation );	
+		printf("move %s to %s.\n", argv[1], argv[2]);
+	}
+	else {										//디렉토리가아닐경우 이름변경
+		error = rename( argv[1], argv[2] );	
+		printf("remane %s to %s.\n", argv[1], argv[2]);
+	}
+
+
+	if( error )		//에러출력
+	{
+		perror( "Unable to relocate or rename file." );
+		return -1;
+	}
+
+	return 0;
 }
 
-void printpathto(ino_t this_inode) {
-   ino_t my_inode;
-   char its_name[BUFSIZ];
-   char (*arr) [BUFSIZ];
 
-   int cnt = 0;
-   int i=0;
-   arr = (char (*)[BUFSIZ])malloc(sizeof(char) * 100 * BUFSIZ);
 
-   my_inode = this_inode;
-
-   while ( get_inode("..") != my_inode) {
-      chdir("..");
-
-      inum_to_name(my_inode , its_name, BUFSIZ);
-
-      my_inode = get_inode(".");
-      strncpy(arr[cnt++], its_name, BUFSIZ);
-   }
-
-   for(i =cnt-1; i>=0;i--)
-      printf("/%s", arr[i]);
-   
-
-   free(arr);
-
-}
-
-void inum_to_name(ino_t inode_to_find, char *namebuf, int buflen) {
-   DIR *dir_ptr;
-   struct dirent *direntp;
-   dir_ptr = opendir(".");
-   if(dir_ptr == NULL) {
-      perror(".");
-      exit(1);
-   }
-
-   while((direntp=readdir(dir_ptr))!=NULL)
-      if(direntp->d_ino==inode_to_find) {
-      strncpy(namebuf, direntp->d_name, buflen);
-      namebuf[buflen-1]='\0';
-      closedir(dir_ptr);
-      return ;
-   }
-//   fprintf(stderr, "error looking for inum %d\n",inode_to_find);
-   exit(1);
-}
-ino_t get_inode(char *fname) {
-   struct stat info;
-   if(stat(fname, &info)==-1) {
-      fprintf(stderr, "cannot stat");
-      perror(fname);
-      exit(1);
-   }
-   return info.st_ino;
-}
